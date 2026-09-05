@@ -1,0 +1,209 @@
+{
+  "source_pdf": "Copy of OWASP Top 10 – Vulnerability Notes_easy.pdf",
+  "chunking_strategy": "one_chunk_per_vulnerability",
+  "total_pages": 7,
+  "total_chunks": 11,
+  "chunks": [
+    {
+      "chunk_id": 1,
+      "category_code": "HEADER",
+      "vulnerability_title": "Document Overview",
+      "page_numbers": [
+        1
+      ],
+      "content": "OWASP Top 10 – Vulnerability Notes \nReference: OWASP Top 10 (2025) and OWASP Cheat Sheet Series",
+      "metadata": {
+        "sections_included": [
+          "Header & Reference"
+        ],
+        "char_count": 95,
+        "word_count": 16
+      }
+    },
+    {
+      "chunk_id": 2,
+      "category_code": "A01",
+      "vulnerability_title": "Broken Access Control",
+      "page_numbers": [
+        1
+      ],
+      "content": "A01:Broken Access Control \nWhat It Is \nIt is a security flaw where an application fails to properly enforce user permissions. This \nallows unauthorized users to view, modify, or delete sensitive data, gain admin privileges, or \naccess restricted features by manipulating requests, URLs, or tokens. \nWhy It Happens \nIt occurs because access controls are not set to \"deny by default\" or are relies too heavily on \nclient-side checks that attackers can easily alter. It also happens when APIs lack permission \nchecks, user records aren't validated for ownership (IDOR), or security tokens (like JWTs) and \nserver files are left misconfigured. \n \nHow to Fix It \n • Always check permissions on the server, not just on the frontend.\n • Block access by default and allow it only when required.\n • Always check that the data belongs to the user before allowing access.\n • Use one common permission-checking method across the application.\n • Record blocked access attempts to detect suspicious activity.",
+      "metadata": {
+        "sections_included": [
+          "What It Is",
+          "Why It Happens",
+          "How to Fix It"
+        ],
+        "char_count": 994,
+        "word_count": 156
+      }
+    },
+    {
+      "chunk_id": 3,
+      "category_code": "A02",
+      "vulnerability_title": "Security Misconfiguration",
+      "page_numbers": [
+        1,
+        2
+      ],
+      "content": "A02:Security Misconfiguration: \nWhat It Is \nIt describes Security Misconfiguration, a flaw where systems, applications, frameworks, or \ncloud environments are set up improperly or left with insecure default settings. This exposes\nsensitive information, reveals internal system mechanics through detailed error messages, or \nleaves open unauthorized access points for attackers. \nWhy It Happens \nIt occurs when default settings and passwords are left unchanged, unnecessary features or \nsample pages are left installed, or security headers and updates are neglected. It is also \ncaused by inconsistent environment configurations, revealing raw stack traces to users, \nprioritizing legacy backward compatibility over security, or failing to enforce a automated \nhardening process. \nHow to Fix It \n• Automate deployment so development, testing, and production environments stay securely \nand consistently configured. \n• Remove or disable unnecessary features, components, sample apps, frameworks, and \ndefault accounts. \n• Separate application components using containers, cloud security groups, and strong \nsecurity headers. \n• Store secrets securely and use short-lived credentials instead of hardcoded API keys. \n• Hide detailed error messages and regularly review configurations, patches, and cloud \npermissions. \n• Use automated security checks to continuously verify settings and perform manual reviews \nat least once a year.",
+      "metadata": {
+        "sections_included": [
+          "What It Is",
+          "Why It Happens",
+          "How to Fix It"
+        ],
+        "char_count": 1428,
+        "word_count": 192
+      }
+    },
+    {
+      "chunk_id": 4,
+      "category_code": "A03",
+      "vulnerability_title": "Software Supply Chain Failures",
+      "page_numbers": [
+        2,
+        3
+      ],
+      "content": "A03:2025-Software Supply Chain Failures: \nWhat It Is : \nIt describes Software Supply Chain Failures, a vulnerability where breakdowns or malicious \ncompromises occur in the third-party code, build tools, libraries, or distribution processes that \nan application relies on. This allows attackers to exploit outdated components or insert \nmalicious code through untrusted dependencies, CI/CD pipelines, and developer \nenvironments. \nWhy It Happens: \n It occurs when organizations fail to track direct and transitive dependencies, use \nunmaintained or outdated software, and neglect regular vulnerability scanning. It is also driven\nby insecure CI/CD pipelines, lack of separation of duties, reliance on untrusted component \nsources, missing change management for developer tooling, and delayed patch deployments. \nHow to Fix It: \n• Keep track of all libraries and dependencies and generate an SBOM to identify \nunused components. \n• Monitor vulnerabilities like CVEs and apply security patches based on their risk level. \n• Secure CI/CD pipelines with MFA, least privilege, role separation, and branch \nprotection. \n• Use trusted sources, secure downloads, package signature checks, and signed build \nartifacts. \n• Track all changes in the development and deployment process and use staged \nupdates.",
+      "metadata": {
+        "sections_included": [
+          "What It Is",
+          "Why It Happens",
+          "How to Fix It"
+        ],
+        "char_count": 1297,
+        "word_count": 182
+      }
+    },
+    {
+      "chunk_id": 5,
+      "category_code": "A04",
+      "vulnerability_title": "Cryptographic Failures",
+      "page_numbers": [
+        3,
+        4
+      ],
+      "content": "A04:2025-Cryptographic Failures: \nWhat It Is \nIt describes Cryptographic Failures, a security vulnerability where data in transit or at rest is \nleft unencrypted, weakly protected, or exposed due to flawed cryptographic practices. This \nleads to the compromise of sensitive information such as passwords, health records, credit \ncard numbers, and business secrets. \nWhy It Happens \nIt occurs due to using outdated algorithms, weak or hardcoded keys, improper key \nmanagement, and non-cryptographic random number generators. It is also caused by failing \nto enforce transport layer security (TLS), using deprecated hashes (like MD5 or SHA1), \nmisconfiguring initialization vectors (IVs), skipping authenticated encryption, and leaking \nside-channel information like padding oracle errors. \nHow to Fix It \n• Identify sensitive data, protect it properly, and delete or tokenize it when it is no longer \nneeded.\n• Encrypt data in transit using TLS 1.2+ and HTTPS, and disable insecure protocols.\n• Encrypt sensitive stored data using strong modern encryption and protect important keys \nsecurely.\n• Store passwords using strong salted hashing methods like Argon2, scrypt, or PBKDF2.\n• Generate keys and nonces securely using CSPRNG and never reuse IVs with the same key.\n• Disable caching of sensitive data, avoid outdated algorithms, and prepare for post-quantum \nsecurity.",
+      "metadata": {
+        "sections_included": [
+          "What It Is",
+          "Why It Happens",
+          "How to Fix It"
+        ],
+        "char_count": 1370,
+        "word_count": 199
+      }
+    },
+    {
+      "chunk_id": 6,
+      "category_code": "A05",
+      "vulnerability_title": "Injection",
+      "page_numbers": [
+        4
+      ],
+      "content": "A05:2025-Injection: \nWhat It Is \nIt describes Injection, a critical application flaw where untrusted user input is passed directly \ninto an interpreter (such as a database, browser, or command line) and processed as code. \nThis allows attackers to manipulate commands, bypass authentication, execute unauthorized \nqueries, or run arbitrary system commands. \nWhy It Happens \n It occurs when applications concatenate user-supplied data directly into dynamic queries, \nscripts, or stored procedures without parameterization or context-aware escaping. It is also \ndriven by missing or inadequate server-side input validation, sanitization, and filtering across \nparameters, headers, cookies, and API payloads. \nHow to Fix It \n• Use parameterized queries, prepared statements, or secure ORM tools to separate \ncommands from user data.\n • Never directly add user input to SQL, NoSQL, OS commands, LDAP, or stored procedures.\n • Validate and filter all user input on the server using strict allowlists.\n • Use proper escaping when dynamic queries are necessary, especially for table or column \nnames.\n • Use SAST, DAST, IAST, code reviews, and fuzzing to find injection vulnerabilities before \ndeployment.",
+      "metadata": {
+        "sections_included": [
+          "What It Is",
+          "Why It Happens",
+          "How to Fix It"
+        ],
+        "char_count": 1198,
+        "word_count": 171
+      }
+    },
+    {
+      "chunk_id": 7,
+      "category_code": "A06",
+      "vulnerability_title": "Insecure Design",
+      "page_numbers": [
+        4,
+        5
+      ],
+      "content": "A06:2025-Insecure Design: \nWhat It Is \nIt describes Insecure Design, a category representing broad security weaknesses caused by \nmissing or ineffective control design. Unlike implementation defects, an insecure design \nmeans essential security controls were never planned or created in the architecture, meaning \neven a flawless coding implementation remains vulnerable to attack.\nWhy It Happens \nIt occurs due to a lack of business risk profiling and failure to gather security requirements \nearly in the software lifecycle. It is also driven by neglecting threat modeling, ignoring misuse \ncases, failing to design secure failure states, omitting tier and tenant segregation, and \ndeveloping software without a Secure Development Lifecycle (SDLC). \nHow to Fix It \n• Follow a secure development process and involve security teams from the beginning of the \nproject.\n • Use approved and secure architecture patterns and reusable components.\n • Regularly perform threat modeling for important features, authentication, and access \ncontrols.\n • Create tests for both normal and misuse cases to ensure the system handles threats safely.\n • Separate application layers and tenants to prevent unauthorized access between them.",
+      "metadata": {
+        "sections_included": [
+          "What It Is",
+          "Why It Happens",
+          "How to Fix It"
+        ],
+        "char_count": 1222,
+        "word_count": 175
+      }
+    },
+    {
+      "chunk_id": 8,
+      "category_code": "A07",
+      "vulnerability_title": "Authentication Failures",
+      "page_numbers": [
+        5
+      ],
+      "content": "A07:2025-Authentication Failures: \nWhat It Is \nIt describes Authentication Failures, a vulnerability that occurs when an attacker tricks a \nsystem into recognizing an invalid or unauthenticated user as legitimate. This allows attackers \nto compromise user accounts, steal identities, and gain unauthorized access to sensitive \napplication features and data. \nWhy It Happens \n It occurs due to permitting automated brute force or credential stuffing attacks, allowing weak \nor known-breached passwords, and using insecure credential recovery options. It is also \ncaused by missing or weak multi-factor authentication (MFA), improper session management \n(such as exposing session IDs in URLs or failing to invalidate them on logout), and unverified \nJWT claims or scopes. \nHow to Fix It \n• Use MFA to protect accounts from brute-force attacks and account takeovers.\n• Block default and weak passwords and check passwords against known breached \ncredentials.\n• Use secure server-side sessions with strong session IDs stored in secure cookies.\n• Use the same login error messages and limit repeated failed login attempts.\n• Strictly verify JWT claims and use trusted identity providers when possible.",
+      "metadata": {
+        "sections_included": [
+          "What It Is",
+          "Why It Happens",
+          "How to Fix It"
+        ],
+        "char_count": 1196,
+        "word_count": 174
+      }
+    },
+    {
+      "chunk_id": 9,
+      "category_code": "A08",
+      "vulnerability_title": "Software or Data Integrity Failures",
+      "page_numbers": [
+        6
+      ],
+      "content": "A08:2025-Software or Data Integrity Failures: \nWhat It Is \nIt describes Software or Data Integrity Failures, a vulnerability where code, dependencies, or \ndata structures are accepted and executed without verifying their authenticity or origin. This \nallows attackers to inject malicious code, tamper with serialized data, or deliver compromised \nupdates across build pipelines and client applications. \nWhy It Happens \n It occurs when applications pull plugins, libraries, or artifacts from untrusted repositories or \nCDNs without checking digital signatures. It is also caused by auto-update mechanisms \nlacking integrity verification, insecure CI/CD pipelines, missing code review processes, and \naccepting untrusted, unsigned serialized data (leading to insecure deserialization attacks). \nHow to Fix It \n• Use digital signatures and checksums to verify that software and dependencies are trusted \nand unchanged.\n • Use trusted official repositories or secure internal repositories for packages.\n • Protect CI/CD pipelines with strict access controls, separate configurations, and mandatory \ncode reviews.\n • Do not deserialize untrusted data unless its integrity and authenticity are properly verified.",
+      "metadata": {
+        "sections_included": [
+          "What It Is",
+          "Why It Happens",
+          "How to Fix It"
+        ],
+        "char_count": 1207,
+        "word_count": 162
+      }
+    },
+    {
+      "chunk_id": 10,
+      "category_code": "A09",
+      "vulnerability_title": "2025 Security Logging & Alerting Failures",
+      "page_numbers": [
+        6,
+        7
+      ],
+      "content": "A09:2025 Security Logging & Alerting Failures: \nWhat It Is \nIt describes Security Logging & Alerting Failures, a flaw where applications fail to record, \ncentralize, monitor, or alert on security-relevant events and system errors. Without adequate \nlogging and real-time alerting, security teams remain unaware of active breaches, leaving \nsystems unable to detect, contain, or investigate attacks. \nWhy It Happens \n It occurs when critical events (such as access control failures, failed logins, or sensitive \ntransactions) are ignored or logged inconsistently. It is also driven by unprotected, local-only\nlogs susceptible to tampering, lack of input encoding on log data, sensitive data leaks within \nlogs (such as PII), excessive false-positive alerts, and missing incident response playbooks. \nHow to Fix It \n• Log login, access control, and validation failures with enough user information for \ninvestigation.\n• Protect logs from tampering and encode log data to prevent log injection attacks.\n• Create clear alerts and response plans while reducing unnecessary false alarms.\n• Use honeytokens and security monitoring tools to detect suspicious activity quickly.\n• Continuously monitor systems, follow an incident response framework, and train developers \nto report attacks.",
+      "metadata": {
+        "sections_included": [
+          "What It Is",
+          "Why It Happens",
+          "How to Fix It"
+        ],
+        "char_count": 1280,
+        "word_count": 183
+      }
+    },
+    {
+      "chunk_id": 11,
+      "category_code": "A10",
+      "vulnerability_title": "Mishandling of Exceptional Conditions",
+      "page_numbers": [
+        7
+      ],
+      "content": "A10:2025-Mishandling of Exceptional Conditions: \nWhat It Is \nIt describes Mishandling of Exceptional Conditions, a vulnerability where applications fail to \nprevent, detect, or correctly respond to unpredictable runtime errors and unexpected states. \nThis leaves systems vulnerable to crashes, unknown operational states, logic bugs, race \nconditions, and resource exhaustion that attackers can exploit. \nWhy It Happens \nIt occurs due to missing or incomplete input validation, unhandled runtime exceptions, and \nhandling errors at a high level rather than locally where they occur. It is also driven by \nunexpected environment states (such as memory or network failures), inconsistent exception \nmanagement, failure to roll back partial transactions, and lack of rate or resource limits. \nHow to Fix It \n• Handle errors where they happen and roll back incomplete transactions to keep data safe. \n• Use a centralized error-handling system so all unexpected errors fail safely. \n• Use rate limits, resource limits, and throttling to prevent system overload and DoS attacks. \n• Log errors, create alerts for suspicious patterns, and group repeated errors to avoid log \nflooding. \n• Perform threat modeling, stress testing, static analysis, and penetration testing to find failure \nrisks before deployment.",
+      "metadata": {
+        "sections_included": [
+          "What It Is",
+          "Why It Happens",
+          "How to Fix It"
+        ],
+        "char_count": 1303,
+        "word_count": 188
+      }
+    }
+  ]
+}

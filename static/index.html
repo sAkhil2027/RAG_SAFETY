@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Groq AI Chatbot</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Marked Markdown Parser & Highlight.js -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-brand">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-bolt-lightning"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>Groq Chat</h1>
+                    <span class="status-badge"><span class="pulse-dot"></span> Groq LPU™ Active</span>
+                </div>
+            </div>
+
+            <div class="header-controls">
+                <div class="model-select-wrapper">
+                    <i class="fa-solid fa-microchip select-icon"></i>
+                    <select id="modelSelect" class="model-select">
+                        <option value="groq/compound-mini">Groq Compound Mini (Fastest)</option>
+                    </select>
+                </div>
+                <button id="clearBtn" class="icon-btn" title="Clear Conversation">
+                    <i class="fa-regular fa-trash-can"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Chat Container -->
+        <main id="chatContainer" class="chat-container">
+            <!-- Welcome Hero View -->
+            <div id="welcomeHero" class="welcome-hero">
+                <div class="hero-avatar">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <h2>How can Groq assist you today?</h2>
+                <p>Ultra-fast AI intelligence powered by Groq LPU™ technology.</p>
+                
+                <div class="suggestions-grid">
+                    <button class="suggestion-card" data-prompt="Explain how Groq LPU hardware achieves high speed inference.">
+                        <i class="fa-solid fa-gauge-high"></i>
+                        <span>How does Groq LPU work?</span>
+                    </button>
+                    <button class="suggestion-card" data-prompt="Write a Python script using FastAPI to stream JSON responses.">
+                        <i class="fa-solid fa-code"></i>
+                        <span>Write FastAPI Streaming script</span>
+                    </button>
+                    <button class="suggestion-card" data-prompt="Draft a polite email asking for a project status update.">
+                        <i class="fa-regular fa-envelope"></i>
+                        <span>Draft status update email</span>
+                    </button>
+                    <button class="suggestion-card" data-prompt="Give me 5 creative ideas for a tech startup in 2026.">
+                        <i class="fa-solid fa-lightbulb"></i>
+                        <span>5 Tech Startup Ideas</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Messages List -->
+            <div id="messageList" class="message-list"></div>
+        </main>
+
+        <!-- Footer Input Section -->
+        <footer class="app-footer">
+            <form id="chatForm" class="input-form">
+                <div class="input-wrapper">
+                    <textarea 
+                        id="userInput" 
+                        placeholder="Type a message... (Press Enter to send, Shift+Enter for new line)" 
+                        rows="1"
+                        required
+                    ></textarea>
+                    <button type="submit" id="sendBtn" class="send-btn" disabled>
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+            </form>
+            <div class="footer-note">
+                <span>Fast & Secure • Powered by Groq API</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Application Logic -->
+    <script src="/static/app.js"></script>
+</body>
+</html>

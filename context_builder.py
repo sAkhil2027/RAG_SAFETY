@@ -59,3 +59,28 @@ def _truncate_context(chunks: List[Dict], max_tokens: int) -> str:
             total_tokens += token_len
 
     return "\n\n".join(context_parts)
+
+
+if __name__ == "__main__":
+    # Demo that loads actual stored chunks from VectorStore
+    # pyrefly: ignore [missing-import]
+    from vector_storage import VectorStore
+    # Initialize the vector store (defaults to ./qdrant_db)
+    store = VectorStore()
+    try:
+        # Retrieve up to 1000 stored points (adjust limit as needed)
+        points, _ = store.client.scroll(
+            collection_name=store.COLLECTION_NAME,
+            limit=1000,
+            with_payload=True,
+            with_vectors=False,
+        )
+        # Extract payload dicts which contain the original chunk metadata
+        chunks = [getattr(pt, "payload", {}) for pt in points]
+    except Exception as e:
+        print(f"[WARN] Unable to retrieve points from VectorStore: {e}")
+        chunks = []
+    max_tokens = 500  # Adjust token budget as needed
+    print("=== Truncated context from stored chunks ===")
+    truncated = _truncate_context(chunks, max_tokens)
+    print(truncated)

@@ -1,5 +1,6 @@
-from dns import asyncquery
-from mpmath import limit
+
+from fastapi import responses
+# duplicate FastAPI import removed
 import os
 import json
 import sys
@@ -64,6 +65,15 @@ except Exception as import_err:
                 hits.append(hit)
             hits.sort(key=lambda r: r.score, reverse=True)
             return hits[:limit]
+
+        def scroll(self, collection_name, limit=1000, with_payload=True, with_vectors=False):
+            """Return stored points for a collection.
+
+            Mimics Qdrant's scroll API used in the demo.
+            Returns a tuple (points, None) where `points` is a list of stored SimplePoint objects.
+            """
+            pts = self.points.get(collection_name, [])[:limit]
+            return pts, None
 
     # Alias QdrantClient to fallback client
     QdrantClient = SimpleInMemoryClient
@@ -168,16 +178,19 @@ class VectorStore:
         return len(points)
 
     def search(self, query: str, limit: int = 3) -> List[Dict[str, Any]]:
-        """Search Qdrant vector database using vector similarity search."""
+        # Encode the query into a vector
         query_vector = self.encoder.encode(query).tolist()
 
-        search_results = self.client.search(
+        # Perform similarity search in Qdrant
+        response = self.client.query_points(
             collection_name=self.COLLECTION_NAME,
-            query_vector=query_vector,
+            query=query_vector,
             limit=limit,
-            vector_name="embedding"
+            using="embedding"
         )
+        search_results = response.points
 
+        # Format results into a list of dicts
         formatted_results = []
         for res in search_results:
             formatted_results.append({
@@ -224,28 +237,6 @@ class VectorStore:
                 print(f"Content Sample: {str(payload.get('content', ''))[:100]}")
         except Exception as e:
             print("[WARN] scroll not available:", e)
-        """Search Qdrant vector database using vector similarity search."""
-        query_vector = self.encoder.encode(query).tolist()
-        
-        search_results = self.client.search(
-            collection_name=self.COLLECTION_NAME,
-            query_vector=query_vector,
-            limit=limit,
-            vector_name="embedding"
-        )
-
-        formatted_results = []
-        for res in search_results:
-            formatted_results.append({
-                "score": round(res.score, 4),
-                "chunk_id": res.payload.get("chunk_id"),
-                "category_code": res.payload.get("category_code"),
-                "vulnerability_title": res.payload.get("vulnerability_title"),
-                "content": res.payload.get("content"),
-                "metadata": res.payload.get("metadata")
-            })
-
-        return formatted_results
 
 
 def process_and_store(pdf_path: str, db_path: str = "./qdrant_db") -> VectorStore:

@@ -62,7 +62,6 @@ async def generate_answer(
             messages=messages,
             temperature=0.2,
             stream=True,
-            stream_options={"include_usage": True},
         )
 
         async for chunk in stream:

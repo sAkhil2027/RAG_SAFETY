@@ -1,3 +1,5 @@
+from dns import asyncquery
+from mpmath import limit
 import os
 import json
 import sys
@@ -7,8 +9,65 @@ from typing import List, Dict, Any, Optional
 from clean_data import run_pipeline
 
 # Import Qdrant and SentenceTransformer libraries
-from qdrant_client import QdrantClient
-from qdrant_client.models import VectorParams, Distance, PointStruct
+try:
+    from qdrant_client import QdrantClient
+    from qdrant_client.models import VectorParams, Distance, PointStruct
+except Exception as import_err:
+    print("[WARN] qdrant_client import failed:", import_err)
+    # Minimal in‑memory fallback client
+    # Simple point container mimicking Qdrant's PointStruct
+    class SimplePoint:
+        def __init__(self, id, vector, payload):
+            self.id = id
+            self.vector = vector
+            self.payload = payload
+
+    # Alias PointStruct to SimplePoint when the real class is unavailable
+    if 'PointStruct' not in globals():
+        PointStruct = SimplePoint
+
+    class SimpleInMemoryClient:
+        def __init__(self, *args, **kwargs):
+            # Accept any args (e.g., path) to be compatible with QdrantClient signature
+            self.collections = {}
+            self.points = {}
+            # Ignore unexpected keyword arguments like 'path'
+            # No further initialization needed for in‑memory storagelf.collections
+
+        def collection_exists(self, name):
+            return name in self.collections
+
+        def delete_collection(self, name):
+            self.collections.pop(name, None)
+            self.points.pop(name, None)
+
+        def create_collection(self, collection_name, vectors_config=None):
+            # vectors_config ignored in in‑memory version
+            self.collections[collection_name] = vectors_config
+            self.points[collection_name] = []
+
+        def upsert(self, collection_name, points):
+            self.points.setdefault(collection_name, []).extend(points)
+
+        def search(self, collection_name, query_vector, limit=5, vector_name=None):
+            import math
+            def cosine(a, b):
+                dot = sum(x * y for x, y in zip(a, b))
+                norm_a = math.sqrt(sum(x * x for x in a))
+                norm_b = math.sqrt(sum(x * x for x in b))
+                return dot / (norm_a * norm_b) if norm_a and norm_b else 0.0
+
+            hits = []
+            for pt in self.points.get(collection_name, []):
+                score = cosine(pt.vector["embedding"], query_vector)
+                hit = type('Res', (), {'score': score, 'payload': pt.payload})
+                hits.append(hit)
+            hits.sort(key=lambda r: r.score, reverse=True)
+            return hits[:limit]
+
+    # Alias QdrantClient to fallback client
+    QdrantClient = SimpleInMemoryClient
+
 from sentence_transformers import SentenceTransformer
 
 # Ensure UTF-8 output encoding for Windows terminal
@@ -32,7 +91,20 @@ class VectorStore:
         """Initialize Qdrant local persistent client and embedding model."""
         self.db_path = db_path
         print(f"Initializing Qdrant Vector DB client at: {db_path}...")
-        self.client = QdrantClient(path=db_path)
+        # Use HTTP mode (requires a running Qdrant server on localhost:6333)
+        # If you prefer embedded mode, ensure qdrant-client local extras are installed.
+        print(f"Initializing Qdrant Vector DB client at: {db_path} (fallback if needed)...")
+        # ==== NEW LOGIC ==== 
+        # For this educational demo we always use the in‑memory fallback client.
+        # This guarantees that the client has the required `search` method and avoids
+        # reliance on an external Qdrant server which may not be running.
+        try:
+            # Attempt to create a real Qdrant client – if it fails we fall back.
+            self.client = QdrantClient(path=db_path)
+        except Exception as e:
+            print("[WARN] Real Qdrant init failed, switching to SimpleInMemoryClient:", e)
+            self.client = SimpleInMemoryClient()
+        # ====================
 
         print(f"Loading Embedding Model ({model_name})...")
         self.encoder = SentenceTransformer(model_name)
@@ -43,10 +115,15 @@ class VectorStore:
         if self.client.collection_exists(self.COLLECTION_NAME):
             self.client.delete_collection(self.COLLECTION_NAME)
 
-        self.client.create_collection(
-            collection_name=self.COLLECTION_NAME,
-            vectors_config=VectorParams(size=self.VECTOR_DIM, distance=Distance.COSINE)
-        )
+        # If the real Qdrant client is available, configure vector params.
+        if 'VectorParams' in globals() and hasattr(self.client, 'create_collection'):
+            self.client.create_collection(
+                collection_name=self.COLLECTION_NAME,
+                vectors_config={"embedding": VectorParams(size=self.VECTOR_DIM, distance=Distance.COSINE)}
+            )
+        else:
+            # Fallback client (in‑memory) does not need vector config.
+            self.client.create_collection(collection_name=self.COLLECTION_NAME)
         print(f"Collection '{self.COLLECTION_NAME}' initialized in Qdrant.")
 
     def embed_and_store(self, chunks: List[Dict[str, Any]]) -> int:
@@ -78,7 +155,7 @@ class VectorStore:
 
             points.append(PointStruct(
                 id=chunk_id,
-                vector=embedding,
+                vector={"embedding": embedding},
                 payload=payload
             ))
 
@@ -93,11 +170,68 @@ class VectorStore:
     def search(self, query: str, limit: int = 3) -> List[Dict[str, Any]]:
         """Search Qdrant vector database using vector similarity search."""
         query_vector = self.encoder.encode(query).tolist()
+
+        search_results = self.client.search(
+            collection_name=self.COLLECTION_NAME,
+            query_vector=query_vector,
+            limit=limit,
+            vector_name="embedding"
+        )
+
+        formatted_results = []
+        for res in search_results:
+            formatted_results.append({
+                "score": round(res.score, 4),
+                "chunk_id": res.payload.get("chunk_id"),
+                "category_code": res.payload.get("category_code"),
+                "vulnerability_title": res.payload.get("vulnerability_title"),
+                "content": res.payload.get("content"),
+                "metadata": res.payload.get("metadata")
+            })
+        return formatted_results
+
+    def inspect_qdrant_db(self) -> None:
+        """Debug helper to check stored items directly in Qdrant (or fallback).
+        Prints collection stats and samples of the first two stored points.
+        """
+        # 1. Collection statistics (real Qdrant only)
+        try:
+            info = self.client.get_collection(self.COLLECTION_NAME)
+            print("\n--- QDRANT STATS ---")
+            print(f"Total Points Stored: {getattr(info, 'points_count', 'N/A')}")
+            print(f"Vectors Count: {getattr(info, 'indexed_vectors_count', 'N/A')}")
+        except Exception as e:
+            print("[WARN] get_collection not available:", e)
+
+        # 2. Retrieve a couple of raw points
+        try:
+            sample_points, _ = self.client.scroll(
+                collection_name=self.COLLECTION_NAME,
+                limit=2,
+                with_payload=True,
+                with_vectors=True,
+            )
+            for pt in sample_points:
+                print(f"\n[POINT ID {getattr(pt, 'id', 'N/A')}]")
+                has_vec = getattr(pt, "vector", None) is not None
+                print(f"Has Vector: {has_vec}")
+                if has_vec:
+                    vec = pt.vector.get("embedding") if isinstance(pt.vector, dict) else pt.vector
+                    length = len(vec) if vec else None
+                    print(f"Vector Length: {length}")
+                payload = getattr(pt, "payload", {})
+                print(f"Payload Keys: {list(payload.keys())}")
+                print(f"Content Sample: {str(payload.get('content', ''))[:100]}")
+        except Exception as e:
+            print("[WARN] scroll not available:", e)
+        """Search Qdrant vector database using vector similarity search."""
+        query_vector = self.encoder.encode(query).tolist()
         
         search_results = self.client.search(
             collection_name=self.COLLECTION_NAME,
             query_vector=query_vector,
-            limit=limit
+            limit=limit,
+            vector_name="embedding"
         )
 
         formatted_results = []
@@ -152,3 +286,4 @@ if __name__ == "__main__":
             print(json.dumps(res, indent=2, ensure_ascii=False))
     else:
         print(f"PDF file not found at: {pdf_file}")
+

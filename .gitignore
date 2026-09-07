@@ -4,17 +4,21 @@ __pycache__/
 *$py.class
 
 # Environment files
+
 .env
 
 # Virtual environments
+
 venv/
 .env/
 .idea/
 
 # VS Code settings
+
 .vscode/
 
 # OS generated files
+
 .DS_Store
 Thumbs.db
 

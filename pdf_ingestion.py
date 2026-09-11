@@ -19,30 +19,102 @@ class VulnerabilityChunk:
 class PDFVulnerabilityIngestor:
     """PDF Ingestion pipeline that creates One Chunk Per Vulnerability topic."""
 
-    TOPIC_HEADING_PATTERN = r'(A\d{2}:[^\n]+)'
-    SUBSECTION_PATTERN = r'(What It Is|Why It Happens|How to Fix It)'
+    TOPIC_HEADING_PATTERN = r'(?i)([aA]\d{2}:[^\n]+)'
+    SUBSECTION_PATTERN = r'(?i)(what it is|why it happens|how to fix it)'
+
+    MIN_REQUIRED_CATEGORIES = 3
+    REQUIRED_SUBSECTIONS = ["What It Is", "Why It Happens", "How to Fix It"]
+
+    def extract_pages_from_doc(self, doc: fitz.Document) -> List[Dict[str, Any]]:
+        """Extract clean text page by page from a fitz Document."""
+        extracted_pages = []
+        for page_idx in range(len(doc)):
+            page = doc[page_idx]
+            raw_text = page.get_text()
+            cleaned_text = self._clean_text(raw_text)
+            if cleaned_text:
+                extracted_pages.append({
+                    "page_number": page_idx + 1,
+                    "text": cleaned_text
+                })
+        return extracted_pages
 
     def extract_pages(self, pdf_path: str) -> List[Dict[str, Any]]:
         """Extract clean text page by page from PDF file."""
         if not os.path.exists(pdf_path):
             raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
-        extracted_pages = []
         doc = fitz.open(pdf_path)
-
-        for page_idx in range(len(doc)):
-            page = doc[page_idx]
-            raw_text = page.get_text()
-            cleaned_text = self._clean_text(raw_text)
-            
-            if cleaned_text:
-                extracted_pages.append({
-                    "page_number": page_idx + 1,
-                    "text": cleaned_text
-                })
-
+        extracted_pages = self.extract_pages_from_doc(doc)
         doc.close()
         return extracted_pages
+
+    def validate_pdf_structure(self, doc: fitz.Document) -> tuple:
+        """Validate whether the PDF strictly matches the expected OWASP Top 10 structure:
+        1. Must contain topic headings matching TOPIC_HEADING_PATTERN (A01:.. to A10:.., case-insensitive).
+        2. Must contain at least MIN_REQUIRED_CATEGORIES (default 3) distinct OWASP categories.
+        3. Must contain the canonical subsections (What It Is, Why It Happens, How to Fix It, case-insensitive).
+        """
+        if len(doc) == 0:
+            return False, "PDF document is empty. Please insert the correct OWASP Top 10 vulnerability notes PDF matching the required topic (A01-A10) and subsection format.", {}
+
+        pages = self.extract_pages_from_doc(doc)
+        full_text = "\n".join(p["text"] for p in pages)
+
+        topic_matches = list(re.finditer(self.TOPIC_HEADING_PATTERN, full_text))
+        if not topic_matches:
+            return False, "No OWASP vulnerability topics (A01-A10) found. Please insert the correct OWASP Top 10 vulnerability notes PDF matching the required topic (A01-A10) and subsection format.", {}
+
+        categories = set()
+        for m in topic_matches:
+            heading = m.group(1).strip()
+            cat_code, _ = self._parse_heading(heading)
+            if re.match(r'^A\d{2}$', cat_code, re.IGNORECASE):
+                categories.add(cat_code.upper())
+
+        if len(categories) < self.MIN_REQUIRED_CATEGORIES:
+            return False, f"Document only contains {len(categories)} OWASP category ({', '.join(sorted(categories)) if categories else 'none'}). Expected at least {self.MIN_REQUIRED_CATEGORIES} topics (A01-A10). Please insert the correct OWASP Top 10 vulnerability notes PDF matching the required topic (A01-A10) and subsection format.", {}
+
+        # Check for required subsections case-insensitively
+        canonical_map = {s.lower(): s for s in self.REQUIRED_SUBSECTIONS}
+        subsections_found_raw = set(re.findall(self.SUBSECTION_PATTERN, full_text))
+        subsections_found_lower = {s.lower() for s in subsections_found_raw}
+        required_lower = {s.lower() for s in self.REQUIRED_SUBSECTIONS}
+        missing_lower = required_lower - subsections_found_lower
+        if missing_lower:
+            missing_display = [canonical_map.get(m, m) for m in missing_lower]
+            return False, f"Document is missing required vulnerability subsections: {', '.join(sorted(missing_display))}. Please insert the correct OWASP Top 10 vulnerability notes PDF matching the required topic (A01-A10) and subsection format.", {}
+
+        stats = {
+            "total_pages": len(doc),
+            "topics_found": len(topic_matches),
+            "categories": sorted(list(categories)),
+            "subsections": sorted([canonical_map.get(s, s.title()) for s in subsections_found_lower])
+        }
+        return True, "Valid OWASP Top 10 vulnerability notes structure", stats
+
+    def validate_pdf_bytes(self, pdf_bytes: bytes) -> tuple:
+        """Validate an uploaded PDF file from raw bytes in memory."""
+        try:
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            is_valid, msg, stats = self.validate_pdf_structure(doc)
+            doc.close()
+            return is_valid, msg, stats
+        except Exception as e:
+            return False, f"Could not read PDF file: {e}. Please insert the correct OWASP Top 10 vulnerability notes PDF.", {}
+
+    def process_bytes(self, pdf_bytes: bytes) -> List[Dict[str, Any]]:
+        """Validate and chunk a PDF directly from memory bytes. Raises ValueError if validation fails."""
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        is_valid, msg, stats = self.validate_pdf_structure(doc)
+        if not is_valid:
+            doc.close()
+            raise ValueError(msg)
+
+        pages = self.extract_pages_from_doc(doc)
+        doc.close()
+        chunks = self.chunk_by_vulnerability(pages)
+        return [asdict(c) for c in chunks]
 
     def chunk_by_vulnerability(self, pages: List[Dict[str, Any]]) -> List[VulnerabilityChunk]:
         """
@@ -63,7 +135,7 @@ class PDFVulnerabilityIngestor:
         topic_matches = list(re.finditer(self.TOPIC_HEADING_PATTERN, full_text))
 
         if not topic_matches:
-            return self._fallback_chunking(full_text, page_map)
+            raise ValueError("No OWASP vulnerability topics (A01-A10) found. Please insert the correct OWASP Top 10 vulnerability notes PDF matching the required topic (A01-A10) and subsection format.")
 
         chunks: List[VulnerabilityChunk] = []
         chunk_id = 1
@@ -98,8 +170,10 @@ class PDFVulnerabilityIngestor:
             cat_code, vul_title = self._parse_heading(raw_heading)
             pages_covered = self._get_pages_for_range(start_pos, end_pos, page_map)
 
-            # Detect sub-sections present in this vulnerability block
-            sections_found = list(dict.fromkeys(re.findall(self.SUBSECTION_PATTERN, raw_content)))
+            # Detect sub-sections present in this vulnerability block (case-insensitive)
+            canonical_map = {s.lower(): s for s in self.REQUIRED_SUBSECTIONS}
+            raw_sections = re.findall(self.SUBSECTION_PATTERN, raw_content)
+            sections_found = list(dict.fromkeys([canonical_map.get(s.lower(), s.title()) for s in raw_sections]))
             if not sections_found:
                 sections_found = ["Overview"]
 
@@ -145,9 +219,9 @@ class PDFVulnerabilityIngestor:
 
     @staticmethod
     def _parse_heading(raw_heading: str) -> tuple:
-        """Extract category code and clean title."""
+        """Extract category code (standardized to uppercase e.g. A01) and clean title."""
         parts = raw_heading.split(':', 1)
-        code = parts[0].strip()
+        code = parts[0].strip().upper()
         title = parts[1].strip() if len(parts) > 1 else raw_heading
         title = re.sub(r'^\d{4}-', '', title).rstrip(':').strip()
         return code, title

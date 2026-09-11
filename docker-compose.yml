@@ -1,0 +1,12 @@
+version: "3.8"
+services:
+  api:
+    build: .
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME:-all-MiniLM-L6-v2}
+      - ADMIN_RELOAD_TOKEN=${ADMIN_RELOAD_TOKEN:-change_me}
+      - ENABLE_ADMIN_ENDPOINT=${ENABLE_ADMIN_ENDPOINT:-false}
+      - UVIORN_WORKERS=${UVIORN_WORKERS:-1}
+    ports:
+      - "8000:8000"

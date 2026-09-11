@@ -1,10 +1,9 @@
 fastapi
 uvicorn[standard]
 python-dotenv
-qdrant-client>=1.9.0
-sentence-transformers
 groq
+numpy
 tiktoken
 pymupdf
 streamlit
- 
+requests

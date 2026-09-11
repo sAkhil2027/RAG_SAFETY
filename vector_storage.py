@@ -1,5 +1,4 @@
-
-from fastapi import responses
+from fastapi import FastAPI, HTTPException
 # duplicate FastAPI import removed
 import os
 import json
@@ -28,12 +27,13 @@ except Exception as import_err:
         PointStruct = SimplePoint
 
     class SimpleInMemoryClient:
+        _shared_collections = {}
+        _shared_points = {}
+
         def __init__(self, *args, **kwargs):
-            # Accept any args (e.g., path) to be compatible with QdrantClient signature
-            self.collections = {}
-            self.points = {}
-            # Ignore unexpected keyword arguments like 'path'
-            # No further initialization needed for in‑memory storagelf.collections
+            # Shared across instances so multiple VectorStore objects share in-memory data
+            self.collections = SimpleInMemoryClient._shared_collections
+            self.points = SimpleInMemoryClient._shared_points
 
         def collection_exists(self, name):
             return name in self.collections
@@ -43,9 +43,8 @@ except Exception as import_err:
             self.points.pop(name, None)
 
         def create_collection(self, collection_name, vectors_config=None):
-            # vectors_config ignored in in‑memory version
             self.collections[collection_name] = vectors_config
-            self.points[collection_name] = []
+            self.points.setdefault(collection_name, [])
 
         def upsert(self, collection_name, points):
             self.points.setdefault(collection_name, []).extend(points)
@@ -66,19 +65,16 @@ except Exception as import_err:
             hits.sort(key=lambda r: r.score, reverse=True)
             return hits[:limit]
 
-        def scroll(self, collection_name, limit=1000, with_payload=True, with_vectors=False):
-            """Return stored points for a collection.
+        def query_points(self, collection_name, query, limit=5, **kwargs):
+            pts = self.search(collection_name, query_vector=query, limit=limit)
+            return type('QueryResponse', (), {'points': pts})()
 
-            Mimics Qdrant's scroll API used in the demo.
-            Returns a tuple (points, None) where `points` is a list of stored SimplePoint objects.
-            """
+        def scroll(self, collection_name, limit=1000, with_payload=True, with_vectors=False):
             pts = self.points.get(collection_name, [])[:limit]
             return pts, None
 
     # Alias QdrantClient to fallback client
     QdrantClient = SimpleInMemoryClient
-
-from sentence_transformers import SentenceTransformer
 
 # Ensure UTF-8 output encoding for Windows terminal
 if hasattr(sys.stdout, 'reconfigure'):
@@ -90,35 +86,21 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 class VectorStore:
     """
-    Vector storage and search engine connected to clean_data output, 
-    generating dense embeddings and storing points in Qdrant vector database.
+    Vector storage and search engine powered by Groq API embeddings, 
+    storing dynamic points in memory for real-time similarity search.
     """
 
     COLLECTION_NAME = "owasp_vulnerabilities"
-    VECTOR_DIM = 384  # Dimension of all-MiniLM-L6-v2
+    VECTOR_DIM = 12  # Normalized 12-dimensional cybersecurity semantic concept vector from Groq
 
-    def __init__(self, db_path: str = "./qdrant_db", model_name: str = "all-MiniLM-L6-v2"):
-        """Initialize Qdrant local persistent client and embedding model."""
+    def __init__(self, db_path: str = "./qdrant_db", model_name: str = "groq/compound-mini"):
+        """Initialize in-memory vector store and Groq cloud embedder."""
         self.db_path = db_path
-        print(f"Initializing Qdrant Vector DB client at: {db_path}...")
-        # Use HTTP mode (requires a running Qdrant server on localhost:6333)
-        # If you prefer embedded mode, ensure qdrant-client local extras are installed.
-        print(f"Initializing Qdrant Vector DB client at: {db_path} (fallback if needed)...")
-        # ==== NEW LOGIC ==== 
-        # For this educational demo we always use the in‑memory fallback client.
-        # This guarantees that the client has the required `search` method and avoids
-        # reliance on an external Qdrant server which may not be running.
-        try:
-            # Attempt to create a real Qdrant client – if it fails we fall back.
-            self.client = QdrantClient(path=db_path)
-        except Exception as e:
-            print("[WARN] Real Qdrant init failed, switching to SimpleInMemoryClient:", e)
-            self.client = SimpleInMemoryClient()
-        # ====================
+        self.client = SimpleInMemoryClient()
 
-        print(f"Loading Embedding Model ({model_name})...")
-        self.encoder = SentenceTransformer(model_name)
-        print("Embedding Model loaded successfully.")
+        # Connect with GroqEmbedder singleton
+        from encoder import get_encoder
+        self.encoder = get_encoder()
 
     def initialize_collection(self):
         """Re-create or initialize Qdrant collection for vector search."""
@@ -136,6 +118,10 @@ class VectorStore:
             self.client.create_collection(collection_name=self.COLLECTION_NAME)
         print(f"Collection '{self.COLLECTION_NAME}' initialized in Qdrant.")
 
+    def reindex_chunks(self, chunks: List[Dict[str, Any]]) -> int:
+        """Clear existing collection and embed + store new chunks in real-time."""
+        return self.embed_and_store(chunks)
+
     def embed_and_store(self, chunks: List[Dict[str, Any]]) -> int:
         """
         Takes cleaned chunks output from clean_data, generates vector embeddings,
@@ -143,17 +129,22 @@ class VectorStore:
         """
         self.initialize_collection()
 
+        valid_chunks = [c for c in chunks if c.get("content", "").strip() or c.get("vulnerability_title", "").strip()]
+        if not valid_chunks:
+            return 0
+
+        texts_to_embed = [
+            f"{c.get('category_code', '')} {c.get('vulnerability_title', '')}: {c.get('content', '')}".strip()
+            for c in valid_chunks
+        ]
+
+        print(f"\nGenerating batch embeddings and preparing Qdrant points for {len(valid_chunks)} chunks...")
+        embeddings = self.encoder.encode(texts_to_embed)
+
         points: List[PointStruct] = []
-
-        print(f"\nGenerating embeddings and preparing Qdrant points for {len(chunks)} chunks...")
-        for c in chunks:
-            chunk_id = c.get("chunk_id", 1)
+        for i, c in enumerate(valid_chunks):
+            chunk_id = c.get("chunk_id", i + 1)
             content_text = c.get("content", "")
-            
-            # 1. Compute dense vector embedding for chunk content
-            embedding = self.encoder.encode(content_text).tolist()
-
-            # 2. Build payload preserving all input chunk properties & metadata
             payload = {
                 "chunk_id": chunk_id,
                 "category_code": c.get("category_code", ""),
@@ -165,7 +156,7 @@ class VectorStore:
 
             points.append(PointStruct(
                 id=chunk_id,
-                vector={"embedding": embedding},
+                vector={"embedding": embeddings[i].tolist()},
                 payload=payload
             ))
 
@@ -178,16 +169,24 @@ class VectorStore:
         return len(points)
 
     def search(self, query: str, limit: int = 3) -> List[Dict[str, Any]]:
-        # Encode the query into a vector
+        # If vector store is empty, return empty list immediately
+        if hasattr(self.client, 'points') and len(self.client.points.get(self.COLLECTION_NAME, [])) == 0:
+            return []
+
+        # Encode the query into a vector via Groq API
         query_vector = self.encoder.encode(query).tolist()
 
         # Perform similarity search in Qdrant
-        response = self.client.query_points(
-            collection_name=self.COLLECTION_NAME,
-            query=query_vector,
-            limit=limit,
-            using="embedding"
-        )
+        try:
+            response = self.client.query_points(
+                collection_name=self.COLLECTION_NAME,
+                query=query_vector,
+                limit=limit,
+                using="embedding"
+            )
+        except Exception as e:
+            print(f"[WARN] Vector search failed: {e}")
+            return []
         search_results = response.points
 
         # Format results into a list of dicts

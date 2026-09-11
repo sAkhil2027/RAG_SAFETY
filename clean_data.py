@@ -71,6 +71,15 @@ class DataCleaner:
 
         return cleaned_chunks
 
+    def process_bytes(self, pdf_bytes: bytes) -> List[Dict[str, Any]]:
+        """Run PDF bytes validation, ingestion and data cleaning with metadata enrichment."""
+        ingested_chunks = self.ingestor.process_bytes(pdf_bytes)
+        return self.clean_ingested_chunks(ingested_chunks)
+
+    def process_chunks(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Clean and enrich a list of already ingested chunks in memory."""
+        return self.clean_ingested_chunks(chunks)
+
     def process_pdf(self, pdf_path: str, output_json_path: Optional[str] = None) -> List[Dict[str, Any]]:
         """Run PDF ingestion and advanced data cleaning with metadata enrichment."""
         print(f"\n[Step 1] Ingesting PDF via pdf_ingestion module...")
@@ -97,10 +106,11 @@ class DataCleaner:
         seen_lower = set()
         unique_kw = []
 
-        # Candidate pool starting with known keywords for category
+        # Candidate pool starting with known keywords for category (case-insensitive lookup)
         candidates = []
-        if category_code in self.KNOWN_KEYWORDS_MAP:
-            candidates.extend(self.KNOWN_KEYWORDS_MAP[category_code])
+        cat_upper = category_code.strip().upper()
+        if cat_upper in self.KNOWN_KEYWORDS_MAP:
+            candidates.extend(self.KNOWN_KEYWORDS_MAP[cat_upper])
 
         # Regex patterns to dynamically catch technical acronyms & terms
         patterns = [

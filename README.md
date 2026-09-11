@@ -6,6 +6,7 @@ An intelligent, secure **Retrieval-Augmented Generation (RAG)** pipeline and web
 
 ## 🚀 Key Features
 
+
 - **Document Ingestion & Chunking (`pdf_ingestion.py`):**
   - Custom PyMuPDF-based parser that chunks documents on a "one chunk per vulnerability" basis (`A01` through `A10`).
   - Preserves subsections (*What It Is*, *Why It Happens*, *How to Fix It*).

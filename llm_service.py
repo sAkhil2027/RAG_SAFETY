@@ -33,6 +33,8 @@ from context_builder import _count_tokens, _truncate_context
 async def generate_answer(
     question: str, chunks: List[Dict], request_id: str
 ) -> AsyncGenerator[str, None]:
+    """Original streaming answer generator (kept unchanged)."""
+
     """Asynchronously stream answer tokens from Groq API.
 
     Parameters
@@ -45,25 +47,54 @@ async def generate_answer(
         Unique identifier for logging audit trails.
     """
     context = _truncate_context(chunks, MAX_CONTEXT_TOKENS)
+    logger.info(f"[REQ {request_id}] Retrieved chunks: {[c.get('category_code') for c in chunks]}, Context length: {len(context)} chars")
+    if not context.strip():
+        logger.warning(f"[REQ {request_id}] Context is EMPTY! Chunk contents: {[c.get('content', '')[:30] for c in chunks]}")
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"},
     ]
 
+    import asyncio
     start_time = time.time()
     token_count = 0
     prompt_tokens = 0
     completion_tokens = 0
 
-    try:
-        # Asynchronous non-blocking streaming call
-        stream = await client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=messages,
-            temperature=0.2,
-            stream=True,
-        )
+    stream = None
+    for attempt in range(3):
+        try:
+            stream = await client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=messages,
+                temperature=0.2,
+                stream=True,
+            )
+            break
+        except Exception as err:
+            err_str = str(err)
+            if ("429" in err_str or "rate_limit" in err_str.lower()) and attempt < 2:
+                logger.warning(f"Groq chat 429 rate limit hit, retrying in 4 seconds (attempt {attempt+1})...")
+                await asyncio.sleep(4.0)
+                continue
+            if attempt == 2 and ("429" in err_str or "rate_limit" in err_str.lower()):
+                try:
+                    logger.info("Attempting fallback chat generation with openai/gpt-oss-20b...")
+                    stream = await client.chat.completions.create(
+                        model="openai/gpt-oss-20b",
+                        messages=messages,
+                        temperature=0.2,
+                        stream=True,
+                    )
+                    break
+                except Exception:
+                    pass
+            logger.error(f"request_id={request_id} error={err}")
+            fallback = "I don't have enough information to answer this question."
+            yield fallback
+            return
 
+    try:
         async for chunk in stream:
             # 1. Capture token usage metrics inside loop when usage chunk arrives
             if hasattr(chunk, "usage") and chunk.usage is not None:
